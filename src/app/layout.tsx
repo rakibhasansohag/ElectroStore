@@ -37,7 +37,7 @@ export default async function RootLayout({
 			>
 				<Providers session={session}>
 					<Navbar />
-					<main className='container mx-auto p-6'>{children}</main>
+					<main className=''>{children}</main>
 				</Providers>
 			</body>
 		</html>
