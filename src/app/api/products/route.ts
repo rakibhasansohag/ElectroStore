@@ -1,7 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
 import { v2 as cloudinary } from 'cloudinary';
-
 
 cloudinary.config({
 	cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -15,15 +15,50 @@ function parseNumber(value: FormDataEntryValue | null, fallback = 0) {
 	return Number.isFinite(n) ? n : fallback;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
 	try {
+		const url = new URL(req.url);
+		const search = url.searchParams.get('search') || '';
+		const sort = url.searchParams.get('sort') || 'newest';
+		const page = Math.max(1, Number(url.searchParams.get('page') || '1'));
+		const limit = Math.min(
+			100,
+			Math.max(1, Number(url.searchParams.get('limit') || '12')),
+		);
+
 		const db = await getDb();
-		const products = await db
+
+		const filter: any = {};
+		if (search) {
+			const q = search.trim();
+			const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+			filter.$or = [
+				{ name: regex },
+				{ brand: regex },
+				{ category: regex },
+				{ description: regex },
+				{ tags: regex },
+				{ sku: regex },
+			];
+		}
+
+		let sortObj: any = { createdAt: -1 }; // newest default
+		if (sort === 'price_asc') sortObj = { price: 1 };
+		else if (sort === 'price_desc') sortObj = { price: -1 };
+		else if (sort === 'oldest') sortObj = { createdAt: 1 };
+
+		const skip = (page - 1) * limit;
+
+		const cursor = db
 			.collection('products')
-			.find()
-			.sort({ createdAt: -1 })
-			.toArray();
-		return NextResponse.json(products);
+			.find(filter)
+			.sort(sortObj)
+			.skip(skip)
+			.limit(limit);
+		const products = await cursor.toArray();
+		const total = await db.collection('products').countDocuments(filter);
+
+		return NextResponse.json({ products, total, page, limit });
 	} catch (err) {
 		console.error('GET /api/products error', err);
 		return NextResponse.json({ error: 'Server error' }, { status: 500 });
@@ -116,7 +151,7 @@ export async function POST(req: Request) {
 
 		// build document
 		const now = new Date();
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 		const productDoc: any = {
 			name,
 			brand: brand || null,
@@ -150,7 +185,6 @@ export async function POST(req: Request) {
 			{ ...productDoc, _id: result.insertedId },
 			{ status: 201 },
 		);
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	} catch (err: any) {
 		console.error('POST /api/products error', err);
 		// Cloudinary error or others

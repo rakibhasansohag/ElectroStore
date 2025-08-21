@@ -1,11 +1,14 @@
-import React from 'react';
+import ProductListClient from '@/components/ProductListClient';
 
-function Products() {
+export const metadata = {
+	title: 'Products — ElectroStore',
+};
+
+export default function ProductsPage() {
 	return (
-		<div>
-			<h1>This is showing the products</h1>
-		</div>
+		<section className='container mx-auto p-6'>
+			<h1 className='text-2xl font-bold mb-4'>Products</h1>
+			<ProductListClient />
+		</section>
 	);
 }
-
-export default Products;
