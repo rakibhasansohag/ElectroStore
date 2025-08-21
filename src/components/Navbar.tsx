@@ -1,8 +1,10 @@
 'use client';
+
 import Link from 'next/link';
 import Image from 'next/image';
 import { signOut, useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
+import ThemeToggle from '@/components/ThemeToggle';
 
 export default function Navbar() {
 	const { data: session, status } = useSession();
@@ -20,7 +22,9 @@ export default function Navbar() {
 				</div>
 
 				<div className='flex items-center gap-3'>
-					{/* Theme toggle etc can be added here */}
+					{/* Theme toggle */}
+					<ThemeToggle />
+
 					{status === 'loading' ? null : session ? (
 						<>
 							<Link href='/dashboard/add-product'>
