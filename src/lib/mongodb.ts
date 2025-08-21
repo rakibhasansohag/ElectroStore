@@ -1,7 +1,10 @@
+
 import { MongoClient, Db } from 'mongodb';
 
-const uri = process.env.MONGODB_URI!;
-if (!uri) throw new Error('MONGODB_URI not set');
+const uri = process.env.MONGODB_URI || process.env.MONGODB_URL;
+if (!uri) throw new Error('MONGODB_URI or MONGODB_URL not set in .env');
+
+const dbNameFromEnv = process.env.MONGODB_DB;
 
 declare global {
 	var _mongoClientPromise: Promise<MongoClient> | undefined;
@@ -9,27 +12,31 @@ declare global {
 	var _mongoDb: Db | undefined;
 }
 
-let client: MongoClient;
 let clientPromise: Promise<MongoClient>;
 
 if (process.env.NODE_ENV === 'development') {
-	// In dev, keep a global to avoid hot reload creating new connections
 	if (!global._mongoClientPromise) {
-		client = new MongoClient(uri);
+		const client = new MongoClient(uri);
 		global._mongoClientPromise = client.connect();
 		global._mongoClient = client;
 	}
-	clientPromise = global._mongoClientPromise;
+	clientPromise = global._mongoClientPromise!;
 } else {
-	client = new MongoClient(uri);
+	const client = new MongoClient(uri);
 	clientPromise = client.connect();
 }
 
-export async function getDb() {
+export async function getDb(): Promise<Db> {
 	const client = await clientPromise;
-	if (process.env.NODE_ENV === 'development' && global._mongoDb)
-		return global._mongoDb;
-	const db = client.db();
-	if (process.env.NODE_ENV === 'development') global._mongoDb = db;
+
+	// if MONGODB_DB is set, use that explicit DB; otherwise rely on the DB in the URI (or driver default)
+	const db = dbNameFromEnv ? client.db(dbNameFromEnv) : client.db();
+
+	if (process.env.NODE_ENV === 'development') {
+		global._mongoDb = db;
+	}
+
+	// helpful debug log when developing
+	console.log('MongoDB connected to DB:', db.databaseName);
 	return db;
 }
